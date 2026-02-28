@@ -1,9 +1,13 @@
 import SwiftUI
 import WebKit
 
+class WebCache {
+    static let shared = WebCache()
+    let processPool = WKProcessPool()
+    let dataStore = WKWebsiteDataStore.default()
+}
+
 struct MainWebView: UIViewRepresentable {
-    static let sharedProcessPool = WKProcessPool()
-    
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
@@ -12,11 +16,9 @@ struct MainWebView: UIViewRepresentable {
         
         configuration.userContentController = userContentController
         
-        // Use a shared process pool to persist cookies more reliably
-        configuration.processPool = MainWebView.sharedProcessPool
-        
-        // Persistent Website Data Store to keep login state
-        configuration.websiteDataStore = WKWebsiteDataStore.default()
+        // Use a strictly shared process pool and data store to prevent session drop
+        configuration.processPool = WebCache.shared.processPool
+        configuration.websiteDataStore = WebCache.shared.dataStore
         
         // Implement the rules.json blocking natively
         let rulesBlockList = """

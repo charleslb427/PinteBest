@@ -54,22 +54,32 @@ function processNode(node) {
     }
 
     // Chercher tous les conteneurs de Pin dans ce noeud
-    const pins = node.matches && node.matches('[data-test-id="pin"]') ? [node] : (node.querySelectorAll ? node.querySelectorAll('[data-test-id="pin"]') : []);
+    const pinSelectors = '[data-test-id="pin"], [data-test-id="pinWrapper"], [role="listitem"], .PinCard, .pinWrapper';
+    const pins = node.matches && node.matches(pinSelectors) ? [node] : (node.querySelectorAll ? Array.from(node.querySelectorAll(pinSelectors)) : []);
 
     pins.forEach(pin => {
-        if (pin.dataset.purified) return; // Ne pas traiter deux fois le même pin
-        pin.dataset.purified = "true";
-
-        let shouldHide = false;
         const textContent = pin.innerText || "";
         const htmlContent = pin.innerHTML || "";
+        const allText = pin.textContent || "";
+        const contentHash = String(htmlContent.length);
 
-        // 2. Filtrage des Publicités
+        if (pin.dataset.purified === contentHash && pin.style.display !== 'none') return;
+        pin.dataset.purified = contentHash;
+
+        let shouldHide = false;
+
+        // 2. Filtrage des Publicités (Adapté pour Mobile Web)
         if (settings.blockAds) {
+            // Regex pour rechercher des mots avec des espaces insécables ou invisibles
             const isAdText = adKeywords.some(keyword => textContent.includes(keyword));
-            const hasAdIndicator = pin.querySelector && pin.querySelector('[data-test-id="pin-ad-indicator"], [data-test-id="ad-badge"]');
 
-            if (isAdText || hasAdIndicator) {
+            // Sélecteurs d'icônes ou de badges cachés
+            const hasAdIndicator = pin.querySelector && pin.querySelector('[data-test-id="pin-ad-indicator"], [data-test-id="ad-badge"], svg[aria-label*="Sponsor"], svg[aria-label*="Promot"], [aria-label*="Annonce"]');
+
+            // Liens sortants suspects ou traceurs de clics
+            const hasAdLink = Array.from(pin.querySelectorAll('a')).some(link => link.href.includes('/ad/') || link.href.includes('out.pinterest.com') || link.href.includes('trk.pinterest.com'));
+
+            if (isAdText || hasAdIndicator || hasAdLink) {
                 shouldHide = true;
             }
         }
