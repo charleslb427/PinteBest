@@ -243,3 +243,54 @@ function forceUnlockScroll() {
         }
     }, 1000);
 }
+
+// --- SCANNER DOM BRUTAL (Pour Mobile Web persistant) ---
+// Pinterest mobile utilise des techniques très agressives pour cacher les pubs au code
+function startAggressiveScanner() {
+    setInterval(() => {
+        if (!settings.blockAds) return;
+
+        // 1. Chercher par texte de force dans tous les petits noeuds
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while ((node = walker.nextNode())) {
+            const text = node.nodeValue.toLowerCase().trim();
+            if (text === 'sponsorisé' || text === 'promoted' || text === 'annonce' || text === 'sponsor' || text === 'promu') {
+                let parent = node.parentNode;
+                // Remonter jusqu'au conteneur majeur le plus proche (limite 8 niveaux)
+                let depth = 0;
+                while (parent && parent !== document.body && depth < 8) {
+                    if (parent.getAttribute && (parent.getAttribute('data-test-id') === 'pin' || parent.getAttribute('role') === 'listitem' || parent.className.includes('pinWrapper') || parent.className.includes('PinCard'))) {
+                        parent.style.display = 'none';
+                        parent.style.opacity = '0';
+                        parent.style.pointerEvents = 'none';
+                        parent.innerHTML = ''; // Destruction nucléaire du contenu HTML pour éviter les re-chargements React
+                        break;
+                    }
+                    parent = parent.parentNode;
+                    depth++;
+                }
+            }
+        }
+
+        // 2. Chercher les liens publicitaires directs
+        const adLinks = document.querySelectorAll('a[href*="/ad/"], a[href*="trk.pinterest.com"], a[href*="out.pinterest.com"]');
+        adLinks.forEach(link => {
+            let parent = link.parentNode;
+            let depth = 0;
+            while (parent && parent !== document.body && depth < 8) {
+                if (parent.getAttribute && (parent.getAttribute('data-test-id') === 'pin' || parent.getAttribute('role') === 'listitem' || parent.className.includes('pinWrapper'))) {
+                    parent.style.display = 'none';
+                    parent.style.opacity = '0';
+                    parent.innerHTML = '';
+                    break;
+                }
+                parent = parent.parentNode;
+                depth++;
+            }
+        });
+    }, 500);
+}
+
+// Lancer le scanner brutal au démarrage
+startAggressiveScanner();
