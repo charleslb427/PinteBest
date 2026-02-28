@@ -42,12 +42,24 @@ struct MainWebView: UIViewRepresentable {
             NotificationCenter.default.addObserver(self, selector: #selector(injectScriptsAndLoad), name: NSNotification.Name("ReloadWebView"), object: nil)
         }
         
-        // Handle popups (like Google Login) by intercepting them and opening them in the main webView
+        var popupWebViews = [WKWebView]()
+        
+        // Handle popups (like Google Login) by creating a new WKWebView over the current one
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
-            return nil
+            let newWebView = WKWebView(frame: webView.bounds, configuration: configuration)
+            newWebView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            newWebView.uiDelegate = self
+            newWebView.navigationDelegate = self
+            newWebView.customUserAgent = webView.customUserAgent
+            
+            webView.addSubview(newWebView)
+            popupWebViews.append(newWebView)
+            return newWebView
+        }
+        
+        func webViewDidClose(_ webView: WKWebView) {
+            webView.removeFromSuperview()
+            popupWebViews.removeAll(where: { $0 == webView })
         }
         
         @objc func injectScriptsAndLoad() {
