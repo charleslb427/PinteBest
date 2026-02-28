@@ -1,3 +1,104 @@
+// --- NUCLÉARISATION DES PUBS AU NIVEAU RÉSEAU (INTERCEPTEUR API) ---
+(function () {
+    function removeAdsFromData(obj) {
+        if (Array.isArray(obj)) {
+            return obj.filter(item => {
+                if (item && (item.is_ad || item.is_promoted || item.is_promoted_pin || (item.pin && (item.pin.is_ad || item.pin.is_promoted)))) {
+                    return false; // On supprime purement et simplement la pub des données !
+                }
+                return true;
+            }).map(removeAdsFromData);
+        } else if (obj !== null && typeof obj === 'object') {
+            const newObj = {};
+            for (const key in obj) {
+                newObj[key] = removeAdsFromData(obj[key]);
+            }
+            return newObj;
+        }
+        return obj;
+    }
+
+    // Intercepter fetch (GraphQL / API modernes)
+    const originalFetch = window.fetch;
+    window.fetch = async function (...args) {
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url);
+        if (url && url.includes('/resource/')) {
+            const response = await originalFetch.apply(this, args);
+            return response.text().then(text => {
+                try {
+                    let json = JSON.parse(text);
+                    json = removeAdsFromData(json);
+                    return new Response(JSON.stringify(json), {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: response.headers
+                    });
+                } catch (e) {
+                    return new Response(text, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: response.headers
+                    });
+                }
+            });
+        }
+        return originalFetch.apply(this, args);
+    };
+
+    // Intercepter XMLHttpRequest (Ancienne API)
+    const XHR = XMLHttpRequest.prototype;
+    const open = XHR.open;
+    const send = XHR.send;
+
+    XHR.open = function (method, url) {
+        this._url = typeof url === 'string' ? url : url.href;
+        return open.apply(this, arguments);
+    };
+
+    XHR.send = function () {
+        if (this._url && this._url.includes('/resource/')) {
+            this.addEventListener('readystatechange', function () {
+                if (this.readyState === 4 && (this.responseType === '' || this.responseType === 'text')) {
+                    try {
+                        let text = this.responseText;
+                        if (text && text.includes('"is_ad"')) {
+                            let json = JSON.parse(text);
+                            json = removeAdsFromData(json);
+                            Object.defineProperty(this, 'responseText', {
+                                get: function () { return JSON.stringify(json); }
+                            });
+                            Object.defineProperty(this, 'response', {
+                                get: function () { return JSON.stringify(json); }
+                            });
+                        }
+                    } catch (e) { }
+                }
+            }, false);
+        }
+        return send.apply(this, arguments);
+    };
+})();
+
+// CSS INJECTÉ DE FORCE (Contre les pubs récalcitrantes sur Safari Mobile)
+const cssIntervention = document.createElement('style');
+cssIntervention.innerHTML = `
+    /* Hiding elements forcefully */
+    div[data-test-id="pinWrapper"]:has([data-test-id="pin-ad-indicator"]),
+    div[data-test-id="pinWrapper"]:has([data-test-id="ad-badge"]),
+    div[data-test-id="pin"]:has(svg[aria-label*="Sponsor"]),
+    div[data-test-id="pin"]:has(svg[aria-label*="Promot"]),
+    .PinCard:has(svg[aria-label*="Sponsor"]),
+    .pinWrapper:has([aria-label*="Annonce"]) {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+`;
+document.head.appendChild(cssIntervention);
+
 // --- CONFIGURATION PAR DÉFAUT ---
 let settings = {
     blockAds: true,

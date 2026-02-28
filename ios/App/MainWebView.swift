@@ -5,6 +5,44 @@ class WebCache {
     static let shared = WebCache()
     let processPool = WKProcessPool()
     let dataStore = WKWebsiteDataStore.default()
+    
+    init() {
+        restoreCookies()
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+            self.saveCookies()
+        }
+    }
+    
+    func saveCookies() {
+        dataStore.httpCookieStore.getAllCookies { cookies in
+            var cookieDicts = [[String: Any]]()
+            for cookie in cookies {
+                if let props = cookie.properties {
+                    var stringDict = [String: Any]()
+                    for (key, value) in props {
+                        stringDict[key.rawValue] = value
+                    }
+                    cookieDicts.append(stringDict)
+                }
+            }
+            UserDefaults.standard.set(cookieDicts, forKey: "saved_cookies_dicts")
+        }
+    }
+    
+    func restoreCookies() {
+        if let cookieDicts = UserDefaults.standard.array(forKey: "saved_cookies_dicts") as? [[String: Any]] {
+            for dict in cookieDicts {
+                var props = [HTTPCookiePropertyKey: Any]()
+                for (key, value) in dict {
+                    props[HTTPCookiePropertyKey(rawValue: key)] = value
+                }
+                if let cookie = HTTPCookie(properties: props) {
+                    dataStore.httpCookieStore.setCookie(cookie, completionHandler: nil)
+                }
+            }
+        }
+    }
 }
 
 struct MainWebView: UIViewRepresentable {
@@ -97,6 +135,10 @@ struct MainWebView: UIViewRepresentable {
         func webViewDidClose(_ webView: WKWebView) {
             webView.removeFromSuperview()
             popupWebViews.removeAll(where: { $0 == webView })
+        }
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            WebCache.shared.saveCookies()
         }
         
         @objc func injectScriptsAndLoad() {
