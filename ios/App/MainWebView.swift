@@ -2,6 +2,8 @@ import SwiftUI
 import WebKit
 
 struct MainWebView: UIViewRepresentable {
+    static let sharedProcessPool = WKProcessPool()
+    
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
@@ -10,8 +12,41 @@ struct MainWebView: UIViewRepresentable {
         
         configuration.userContentController = userContentController
         
+        // Use a shared process pool to persist cookies more reliably
+        configuration.processPool = MainWebView.sharedProcessPool
+        
         // Persistent Website Data Store to keep login state
         configuration.websiteDataStore = WKWebsiteDataStore.default()
+        
+        // Implement the rules.json blocking natively
+        let rulesBlockList = """
+        [
+            {
+                "trigger": {
+                    "url-filter": "ct\\\\.pinterest\\\\.com"
+                },
+                "action": {
+                    "type": "block"
+                }
+            },
+            {
+                "trigger": {
+                    "url-filter": "trk\\\\.pinterest\\\\.com"
+                },
+                "action": {
+                    "type": "block"
+                }
+            }
+        ]
+        """
+        
+        WKContentRuleListStore.default().compileContentRuleList(
+            forIdentifier: "PinterestBlocker",
+            encodedContentRuleList: rulesBlockList) { (ruleList, error) in
+                if let ruleList = ruleList {
+                    configuration.userContentController.add(ruleList)
+                }
+        }
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         // Set standard user agent to avoid Google Login "disallowed_useragent" errors

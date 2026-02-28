@@ -11,7 +11,7 @@ let settings = {
 const fastFashionDomains = ['temu.com', 'shein.', 'aliexpress.com', 'wish.com', 'romwe.com', 'cider.com'];
 
 // Mots-clés indiquant du contenu sponsorisé dans différentes langues
-const adKeywords = ['Sponsorisé', 'Promoted', 'Annonce', 'Ad'];
+const adKeywords = ['Sponsorisé', 'Promoted', 'Annonce', 'Ad', 'Sponsor', 'Promu'];
 
 // --- INITIALISATION ---
 chrome.storage.sync.get(settings, (loadedSettings) => {
@@ -38,7 +38,7 @@ function initObserver() {
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-    
+
     // Traiter les éléments déjà présents au chargement
     document.querySelectorAll('[data-test-id="pinWrapper"]').forEach(processNode);
 }
@@ -55,7 +55,7 @@ function processNode(node) {
 
     // Chercher tous les conteneurs de Pin dans ce noeud
     const pins = node.matches && node.matches('[data-test-id="pin"]') ? [node] : (node.querySelectorAll ? node.querySelectorAll('[data-test-id="pin"]') : []);
-    
+
     pins.forEach(pin => {
         if (pin.dataset.purified) return; // Ne pas traiter deux fois le même pin
         pin.dataset.purified = "true";
@@ -66,8 +66,12 @@ function processNode(node) {
 
         // 2. Filtrage des Publicités
         if (settings.blockAds) {
-            const isAd = adKeywords.some(keyword => textContent.includes(keyword));
-            if (isAd) shouldHide = true;
+            const isAdText = adKeywords.some(keyword => textContent.includes(keyword));
+            const hasAdIndicator = pin.querySelector && pin.querySelector('[data-test-id="pin-ad-indicator"], [data-test-id="ad-badge"]');
+
+            if (isAdText || hasAdIndicator) {
+                shouldHide = true;
+            }
         }
 
         // 3. Filtrage de la Fast Fashion
@@ -105,7 +109,7 @@ function initKeyboardNav() {
     document.addEventListener('keydown', (e) => {
         // Uniquement si on est sur la vue détaillée d'un pin (/pin/12345...)
         if (!window.location.pathname.startsWith('/pin/')) return;
-        
+
         // Ne rien faire si on tape dans un champ de recherche ou de commentaire
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
