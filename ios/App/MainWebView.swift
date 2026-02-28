@@ -14,8 +14,11 @@ struct MainWebView: UIViewRepresentable {
         configuration.websiteDataStore = WKWebsiteDataStore.default()
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+        // Set standard user agent to avoid Google Login "disallowed_useragent" errors
+        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         webView.scrollView.bounces = false
+        
+        webView.uiDelegate = coordinator
         
         coordinator.webView = webView
         coordinator.setupObserver()
@@ -32,11 +35,19 @@ struct MainWebView: UIViewRepresentable {
         Coordinator()
     }
     
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate {
         weak var webView: WKWebView?
         
         func setupObserver() {
             NotificationCenter.default.addObserver(self, selector: #selector(injectScriptsAndLoad), name: NSNotification.Name("ReloadWebView"), object: nil)
+        }
+        
+        // Handle popups (like Google Login) by intercepting them and opening them in the main webView
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                webView.load(navigationAction.request)
+            }
+            return nil
         }
         
         @objc func injectScriptsAndLoad() {
