@@ -44,7 +44,7 @@ jobs:
           # Les variables CODE_SIGN* désactivent la signature requise par Apple afin de générer un binaire sideloadable.
           xcodebuild clean build \
             -project "PinterestPurifier.xcodeproj" \
-            -scheme "PinterestPurifier" \
+            -scheme "PinterestPurifier (iOS)" \
             -configuration Release \
             -sdk iphoneos \
             -arch arm64 \
