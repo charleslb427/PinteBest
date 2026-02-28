@@ -1,0 +1,25 @@
+name: PinterestPurifierNative
+options:
+  bundleIdPrefix: com.pinterestpurifier
+targets:
+  PinterestPurifierNative:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources: [App]
+    resources:
+      - path: ../content.js
+        type: file
+    info:
+      path: App/Info.plist
+      properties:
+        UILaunchStoryboardName: LaunchScreen
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIBackgroundModes: ["fetch"]
+    settings:
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: "NO"
+      CODE_SIGNING_ALLOWED: "NO"
