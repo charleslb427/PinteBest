@@ -1,0 +1,81 @@
+name: Build iOS IPA (Safari Web Extension)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Permet de lancer le workflow manuellement depuis GitHub
+
+jobs:
+  build-ipa:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Extension Directory
+        run: |
+          echo "Création d'un dossier racine pour l'extension..."
+          mkdir -p ExtensionContent
+          # On copie le contenu de l'extension (on exclut les dossiers liés à git ou la CI)
+          find . -maxdepth 1 ! -name "ExtensionContent" ! -name ".git" ! -name ".github" ! -name "." -exec cp -r {} ExtensionContent/ \;
+          
+      - name: Build Xcode Project via converter
+        run: |
+          echo "Conversion de l'extension web en projet Safari Web Extension Xcode..."
+          xcrun safari-web-extension-converter ExtensionContent \
+            --project-location ./XcodeProject \
+            --app-name "PinterestPurifier" \
+            --bundle-identifier "com.pinterestpurifier.ios" \
+            --swift \
+            --no-prompt \
+            --no-open
+            
+      - name: Build iOS App (Without Code Signing)
+        run: |
+          cd XcodeProject/PinterestPurifier
+          
+          echo "Liste des schemes disponibles :"
+          xcodebuild -list
+          
+          # On compile le projet pour la plateforme iOS (iphoneos) en mode Release.
+          # Les variables CODE_SIGN* désactivent la signature requise par Apple afin de générer un binaire sideloadable.
+          xcodebuild clean build \
+            -project "PinterestPurifier.xcodeproj" \
+            -scheme "PinterestPurifier" \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            BUILD_DIR="$(pwd)/build"
+            
+      - name: Package to IPA
+        run: |
+          cd XcodeProject/PinterestPurifier
+          
+          # Création du dossier Payload requis pour un fichier IPA
+          mkdir -p Payload
+          
+          # On recherche l'application iOS générée et on la déplace dans Payload/
+          APP_PATH=$(find build/Release-iphoneos -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Erreur : Fichier .app introuvable !"
+            exit 1
+          fi
+          
+          echo "Application trouvée : $APP_PATH"
+          mv "$APP_PATH" Payload/
+          
+          # Compression au format .ipa
+          zip -r PinterestPurifier.ipa Payload
+          
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PinterestPurifier-iOS
+          path: XcodeProject/PinterestPurifier/PinterestPurifier.ipa
+          retention-days: 7

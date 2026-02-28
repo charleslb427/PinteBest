@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "ct.pinterest.com",
+      "resourceTypes": ["script", "xmlhttprequest", "ping", "image"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "trk.pinterest.com",
+      "resourceTypes": ["script", "xmlhttprequest", "ping", "image"]
+    }
+  }
+]
